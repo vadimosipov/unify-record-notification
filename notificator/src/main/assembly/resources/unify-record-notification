@@ -1,0 +1,123 @@
+#!/bin/bash
+
+#
+# service script for Unify Record Notification Service
+#
+# usage:
+#  installation
+#    sudo ./unify-record-notification install
+#
+#  run
+#    sudo service unifyrnd start
+#
+
+NAME="Unify Record Notification Service"
+PIDFILE=/var/run/unifyrnd.pid
+LOGDIR=/var/log/unifyrnd
+USER=unifyrnduser
+PID=`cat $PIDFILE 2>/dev/null`
+SCRIPT_DIR=`dirname "$(readlink -f "$0")"`
+SCRIPT_NAME=Unify-record-notification
+
+if ps -p $PID > /dev/null 2>&1; 
+then
+  RUNNING=1
+fi
+
+start() {
+    if [ -n "$RUNNING" ] 
+    then
+    	echo "$NAME is already running"
+	    return
+    fi
+
+    echo "Starting $NAME..."
+
+    touch $PIDFILE
+    chown $USER $PIDFILE
+    cd $SCRIPT_DIR
+
+    su -s /bin/sh $USER -c "
+        java -cp \"./conf" ru.cti.iss.unify.notificator.EntryPoint >/dev/null 2>/dev/null &
+        echo \$! >$PIDFILE
+    "
+}
+
+run() {
+    java -cp \"./conf" ru.cti.iss.unify.notificator.EntryPoint
+}
+
+stop() {
+    if [ -z "$RUNNING" ]
+    then
+        echo "$NAME is not running"
+        return
+    fi
+
+    echo "Stopping $NAME... "
+    kill $PID
+    rm -f $PIDFILE
+    RUNNING=""
+}
+
+status() {
+    if [ -n "$RUNNING" ] 
+    then
+    	echo "$NAME is running"
+	    return
+    fi
+
+    echo "$NAME is not running"
+}
+
+install() {
+# ubuntu
+#    adduser --system --no-create-home -q $USER
+# redhat
+    adduser -r $USER
+
+    mkdir -p $LOGDIR
+    chown $USER $LOGDIR
+    ln -s -f $SCRIPT_DIR/$SCRIPT_NAME /etc/init.d/unifyrnd
+    ln -s -f $SCRIPT_DIR/$SCRIPT_NAME /etc/rc2.d/S91unifyrnd
+    echo "Installed $NAME as a service unifyrnd. "
+}
+
+uninstall() {
+    deluser $USER
+    rm -rf $LOGDIR
+    rm -rf /etc/init.d/unifyrnd
+    rm -rf /etc/rc2.d/S91unifyrnd
+    echo "Uninstalled $NAME service"
+}
+
+case "$1" in
+    start)
+	start
+	;;
+    stop)
+	stop
+	;;
+    restart)
+	stop
+	start
+	;;
+    status)
+	status
+	;;
+    install)
+	install
+	;;
+    uninstall)
+	uninstall
+	;;
+    run)
+	run
+	;;
+    *)
+	echo "Usage: (start|stop|restart|status|install|unistall)"
+	exit 1;
+	;;
+esac
+
+exit $?
